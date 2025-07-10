@@ -1,42 +1,78 @@
+import os
 import threading
 from selenium import webdriver
-from selenium.webdriver.common.by import By
+from dotenv import load_dotenv
 
-BROWSERSTACK_USERNAME = "YOUR_USERNAME"
-BROWSERSTACK_ACCESS_KEY = "YOUR_ACCESS_KEY"
+load_dotenv()
 
-devices = [
-    {"os": "Windows", "os_version": "10", "browser": "Chrome", "browser_version": "latest"},
-    {"os": "OS X", "os_version": "Ventura", "browser": "Safari", "browser_version": "latest"},
-    {"device": "Samsung Galaxy S22", "real_mobile": "true", "os_version": "12.0"},
-    {"device": "iPhone 14", "real_mobile": "true", "os_version": "16"},
-    {"os": "Windows", "os_version": "11", "browser": "Firefox", "browser_version": "latest"},
+USERNAME = os.getenv("BROWSERSTACK_USERNAME")
+ACCESS_KEY = os.getenv("BROWSERSTACK_ACCESS_KEY")
+
+URL = f"https://{USERNAME}:{ACCESS_KEY}@hub-cloud.browserstack.com/wd/hub"
+
+# List of desired capabilities for 5 different browsers/devices
+capabilities = [
+    {
+        "browserName": "Chrome",
+        "browserVersion": "latest",
+        "os": "Windows",
+        "osVersion": "10",
+        "name": "Chrome_Win10"
+    },
+    {
+        "browserName": "Firefox",
+        "browserVersion": "latest",
+        "os": "OS X",
+        "osVersion": "Monterey",
+        "name": "Firefox_macOS"
+    },
+    {
+        "deviceName": "Samsung Galaxy S22",
+        "osVersion": "12.0",
+        "browserName": "Chrome",
+        "realMobile": "true",
+        "name": "Galaxy_Chrome_Mobile"
+    },
+    {
+        "deviceName": "iPhone 14",
+        "osVersion": "16",
+        "browserName": "Safari",
+        "realMobile": "true",
+        "name": "iPhone_Safari"
+    },
+    {
+        "browserName": "Edge",
+        "browserVersion": "latest",
+        "os": "Windows",
+        "osVersion": "11",
+        "name": "Edge_Win11"
+    }
 ]
 
+# Test function to run in parallel
 def run_test(cap):
-    url = "https://elpais.com/opinion/"
-    desired_cap = {
-        "browserstack.user": BROWSERSTACK_USERNAME,
-        "browserstack.key": BROWSERSTACK_ACCESS_KEY,
-        "name": "El Pais Opinion Test",
-        **cap
-    }
+    options = webdriver.ChromeOptions()
+    for key, value in cap.items():
+        options.set_capability(key, value)
+
     driver = webdriver.Remote(
-        command_executor="http://hub-cloud.browserstack.com/wd/hub",
-        desired_capabilities=desired_cap
+        command_executor=URL,
+        options=options
     )
+
     try:
-        driver.get(url)
-        heading = driver.title
-        print(f"{heading} | {cap.get('device', cap.get('browser'))}")
+        driver.get("https://www.google.com")
+        print(f"✅ Visited Google on: {cap.get('name', 'Unnamed Test')}")
     finally:
         driver.quit()
 
+# Launch tests in parallel
 threads = []
-for cap in devices:
-    thread = threading.Thread(target=run_test, args=(cap,))
-    threads.append(thread)
-    thread.start()
+
+for cap in capabilities:
+    t = threading.Thread(target=run_test, args=(cap,))
+    t.start()
+    threads.append(t)
 
 for t in threads:
     t.join()
