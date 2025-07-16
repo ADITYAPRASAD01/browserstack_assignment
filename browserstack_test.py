@@ -1,17 +1,17 @@
 import os
 import threading
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from dotenv import load_dotenv
 
+# Load .env file
 load_dotenv()
-
 USERNAME = os.getenv("BROWSERSTACK_USERNAME")
 ACCESS_KEY = os.getenv("BROWSERSTACK_ACCESS_KEY")
-
 URL = f"https://{USERNAME}:{ACCESS_KEY}@hub-cloud.browserstack.com/wd/hub"
 
-# List of desired capabilities for 5 different browsers/devices
-capabilities = [
+# Browser/device configurations
+capabilities_list = [
     {
         "browserName": "Chrome",
         "browserVersion": "latest",
@@ -49,9 +49,10 @@ capabilities = [
     }
 ]
 
-# Test function to run in parallel
+# Test function
 def run_test(cap):
-    options = webdriver.ChromeOptions()
+    # Use ChromeOptions only to carry capabilities – it works cross-browser here
+    options = Options()
     for key, value in cap.items():
         options.set_capability(key, value)
 
@@ -62,14 +63,27 @@ def run_test(cap):
 
     try:
         driver.get("https://www.google.com")
-        print(f"✅ Visited Google on: {cap.get('name', 'Unnamed Test')}")
+        if "Google" in driver.title:
+            driver.execute_script(
+                'browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"passed","reason": "Google loaded successfully"}}'
+            )
+            print(f"✅ Passed: {cap['name']}")
+        else:
+            driver.execute_script(
+                'browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"failed","reason": "Title mismatch"}}'
+            )
+            print(f"❌ Failed: {cap['name']} - Title mismatch")
+    except Exception as e:
+        driver.execute_script(
+            f'browserstack_executor: {{"action": "setSessionStatus", "arguments": {{"status":"failed","reason": "{str(e)}"}}}}'
+        )
+        print(f"❌ Error: {cap['name']} - {e}")
     finally:
         driver.quit()
 
-# Launch tests in parallel
+# Parallel execution
 threads = []
-
-for cap in capabilities:
+for cap in capabilities_list:
     t = threading.Thread(target=run_test, args=(cap,))
     t.start()
     threads.append(t)
